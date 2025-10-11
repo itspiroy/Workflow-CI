@@ -66,11 +66,11 @@ jobs:
             - name: Check model artifacts
               run: |
                   if [ -d "MLProject/mlruns" ]; then
-                    echo "✅ MLflow artifacts created successfully"
+                    echo " MLflow artifacts created successfully"
                     find MLProject/mlruns -type f -name "*.pkl" -o -name "*.json" | head -10
                     ls -la MLProject/mlruns/
                   else
-                    echo "❌ No MLflow artifacts found"
+                    echo " No MLflow artifacts found"
                     ls -la MLProject/
                     exit 1
                   fi
@@ -111,7 +111,7 @@ jobs:
                       # Get latest run
                       experiment = mlflow.get_experiment_by_name('diabetes-basic')
                       if experiment is None:
-                          print('❌ Experiment \"diabetes-basic\" not found')
+                          print(' Experiment \"diabetes-basic\" not found')
                           # List all experiments
                           experiments = mlflow.search_experiments()
                           print('Available experiments:')
@@ -123,7 +123,7 @@ jobs:
                       
                       runs = mlflow.search_runs(experiment_ids=[experiment.experiment_id])
                       if runs.empty:
-                          print('❌ No runs found in experiment')
+                          print(' No runs found in experiment')
                           sys.exit(1)
                           
                       print(f'Found {len(runs)} runs')
@@ -133,7 +133,7 @@ jobs:
                       
                       # Check if accuracy metric exists
                       if 'metrics.accuracy' not in latest_run or pd.isna(latest_run['metrics.accuracy']):
-                          print('❌ Accuracy metric not found in latest run')
+                          print(' Accuracy metric not found in latest run')
                           print('Available metrics:', [col for col in latest_run.index if col.startswith('metrics.')])
                           sys.exit(1)
                       
@@ -145,15 +145,15 @@ jobs:
                       # Validation criteria
                       min_accuracy = 0.70
                       if accuracy >= min_accuracy:
-                          print(f'✅ Model passed validation (accuracy {accuracy:.4f} >= {min_accuracy})')
+                          print(f' Model passed validation (accuracy {accuracy:.4f} >= {min_accuracy})')
                           print('Model is ready for deployment!')
                       else:
-                          print(f'❌ Model failed validation (accuracy {accuracy:.4f} < {min_accuracy})')
+                          print(f' Model failed validation (accuracy {accuracy:.4f} < {min_accuracy})')
                           print('Model needs improvement before deployment.')
                           sys.exit(1)
                           
                   except Exception as e:
-                      print(f'❌ Error during validation: {str(e)}')
+                      print(f' Error during validation: {str(e)}')
                       import traceback
                       traceback.print_exc()
                       sys.exit(1)
@@ -172,10 +172,10 @@ jobs:
                   echo "" >> ../training_summary.md
 
                   if [ -d "mlruns" ]; then
-                    echo "- **Status**: ✅ Training completed successfully" >> ../training_summary.md
+                    echo "- **Status**:  Training completed successfully" >> ../training_summary.md
                     echo "- **Artifacts**: MLflow artifacts generated" >> ../training_summary.md
                   else
-                    echo "- **Status**: ❌ Training failed" >> ../training_summary.md
+                    echo "- **Status**:  Training failed" >> ../training_summary.md
                   fi
 
                   cat ../training_summary.md
@@ -187,3 +187,28 @@ jobs:
                   name: training-summary
                   path: training_summary.md
                   retention-days: 30
+
+            - name: Upload MLflow artifacts to GitHub
+              if: always()
+              run: |
+                  echo " Uploading MLflow artifacts to repository..."
+                  git config --global user.email "shafiramaulidinaa@gmail.com"
+                  git config --global user.name "itspiroy"
+
+                  # Pastikan folder hasil training ada
+                  if [ -d "MLProject/mlruns" ]; then
+                    cd MLProject
+                    git init
+                    git remote add origin https://github.com/itspiroy/Eksperimen_SML_Shafira-Maulidina.git
+                    git fetch origin
+                    git checkout main
+                    cp -r mlruns ../mlruns_backup
+                    cd ..
+                    cp -r mlruns_backup/* .
+                    rm -rf mlruns_backup
+                    git add MLProject/mlruns/
+                    git commit -m "Auto upload MLflow artifacts [skip ci]" || echo "No changes to commit"
+                    git push https://$GH_TOKEN@github.com/itspiroy/Eksperimen_SML_Shafira-Maulidina.git main
+                  else
+                    echo " No MLflow artifacts found to upload."
+                  fi
