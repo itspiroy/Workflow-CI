@@ -1,0 +1,10 @@
+artifact_location: file:///C:/Users/aulin/OneDrive - Virtual Education Academy/Documents/Project/Dicoding/MLOps/Workflow_CI/MLProject/mlruns/520009125152221463/models/m-565ea6c113cc445da8ea93cb89acfd87/artifacts
+creation_timestamp: 1760190908241
+experiment_id: '520009125152221463'
+last_updated_timestamp: 1760190910286
+model_id: m-565ea6c113cc445da8ea93cb89acfd87
+model_type: null
+name: model
+source_run_id: 74cd5aa5769c4b2eb71743888e23eafb
+status: 3
+status_message: null
