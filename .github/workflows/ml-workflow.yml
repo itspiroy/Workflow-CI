@@ -204,3 +204,6 @@ jobs:
                   git add MLProject/mlruns/
                   git commit -m "Auto upload MLflow artifacts [skip ci]" || echo "No changes to commit"
                   git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/itspiroy/Workflow-CI.git main
+
+            - name: Set MLflow Tracking URI
+              run: echo "MLFLOW_TRACKING_URI=file:./mlruns" >> $GITHUB_ENV
