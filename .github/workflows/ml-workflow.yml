@@ -191,24 +191,16 @@ jobs:
             - name: Upload MLflow artifacts to GitHub
               if: always()
               run: |
-                  echo " Uploading MLflow artifacts to repository..."
-                  git config --global user.email "shafiramaulidinaa@gmail.com"
-                  git config --global user.name "itspiroy"
+                  echo "📦 Uploading MLflow artifacts to repository..."
+                  git config --global user.email "github-actions@github.com"
+                  git config --global user.name "github-actions[bot]"
 
-                  # Pastikan folder hasil training ada
-                  if [ -d "MLProject/mlruns" ]; then
-                    cd MLProject
-                    git init
-                    git remote add origin https://github.com/itspiroy/Workflow-CI.git
-                    git fetch origin
-                    git checkout main
-                    cp -r mlruns ../mlruns_backup
-                    cd ..
-                    cp -r mlruns_backup/* .
-                    rm -rf mlruns_backup
-                    git add MLProject/mlruns/
-                    git commit -m "Auto upload MLflow artifacts [skip ci]" || echo "No changes to commit"
-                    git push https://$GH_TOKEN@github.com/itspiroy/Workflow-CI.git main
-                  else
-                    echo " No MLflow artifacts found to upload."
-                  fi
+                  cd MLProject
+                  git init
+                  git remote add origin https://github.com/itspiroy/Workflow-CI.git
+                  git fetch origin main
+                  git checkout main
+                  cd ..
+                  git add MLProject/mlruns/
+                  git commit -m "Auto upload MLflow artifacts [skip ci]" || echo "No changes to commit"
+                  git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/itspiroy/Workflow-CI.git main
