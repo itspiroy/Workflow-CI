@@ -1,0 +1,14 @@
+artifact_uri: file:///C:/Users/aulin/OneDrive - Virtual Education Academy/Documents/Project/Dicoding/MLOps/Workflow_CI/MLProject/mlruns/520009125152221463/3d52edcad4c74101a8839a7b5f5743cd/artifacts
+end_time: 1760497549715
+entry_point_name: ''
+experiment_id: '520009125152221463'
+lifecycle_stage: active
+run_id: 3d52edcad4c74101a8839a7b5f5743cd
+run_name: logreg_baseline_20251015_030547
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1760497547436
+status: 3
+tags: []
+user_id: runner
