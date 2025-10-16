@@ -54,7 +54,7 @@ jobs:
 
             - name: Verify installation
               run: |
-                  python -c "import mlflow, sklearn, pandas, numpy, matplotlib, seaborn; print('All packages imported successfully')"
+                  python -c "import mlflow, sklearn, pandas, numpy, matplotlib, seaborn; print('✅ All packages imported successfully!')"
                   python --version
                   pip list
 
@@ -66,11 +66,10 @@ jobs:
             - name: Check model artifacts
               run: |
                   if [ -d "MLProject/mlruns" ]; then
-                    echo " MLflow artifacts created successfully"
+                    echo "✅ MLflow artifacts created successfully"
                     find MLProject/mlruns -type f -name "*.pkl" -o -name "*.json" | head -10
-                    ls -la MLProject/mlruns/
                   else
-                    echo " No MLflow artifacts found"
+                    echo "❌ No MLflow artifacts found"
                     ls -la MLProject/
                     exit 1
                   fi
@@ -96,46 +95,37 @@ jobs:
             - name: Model validation
               run: |
                   cd MLProject
-                  python -c "
+                  python - <<'PYCODE'
                   import mlflow
                   import pandas as pd
                   import sys
-                  import os
 
-                  print('Starting model validation...')
+                  print("🚀 Starting model validation...")
 
-                  # Set tracking URI
-                  mlflow.set_tracking_uri('file:./mlruns')
+                  mlflow.set_tracking_uri("file:./mlruns")
 
                   try:
-                      # Get latest run
-                      experiment = mlflow.get_experiment_by_name('diabetes-basic')
+                      experiment = mlflow.get_experiment_by_name("diabetes-basic")
                       if experiment is None:
-                          print(' Experiment \"diabetes-basic\" not found')
-                          # List all experiments
-                          experiments = mlflow.search_experiments()
-                          print('Available experiments:')
-                          for exp in experiments:
-                              print(f'  - {exp.name} (ID: {exp.experiment_id})')
+                          print("❌ Experiment 'diabetes-basic' not found.")
                           sys.exit(1)
-                      
-                      print(f'Found experiment: {experiment.name} (ID: {experiment.experiment_id})')
-                      
+
+                      print(f"✅ Found experiment: {experiment.name} (ID: {experiment.experiment_id})")
+
                       runs = mlflow.search_runs(experiment_ids=[experiment.experiment_id])
                       if runs.empty:
-                          print(' No runs found in experiment')
+                          print("❌ No runs found in this experiment.")
                           sys.exit(1)
-                          
-                      print(f'Found {len(runs)} runs')
-                      
-                      # Get latest run (first row is most recent)
+
+                      print(f"ℹ️ Found {len(runs)} runs in MLflow.")
+
                       latest_run = runs.iloc[0]
-                      
-                      # Check if accuracy metric exists
+
+                      # Try to find the correct accuracy metric key
                       possible_metrics = [
-                          'metrics.accuracy',
-                          'metrics.training_accuracy_score',
-                          'metrics.training_score'
+                          "metrics.accuracy",
+                          "metrics.training_accuracy_score",
+                          "metrics.training_score"
                       ]
 
                       metric_found = None
@@ -145,29 +135,32 @@ jobs:
                               break
 
                       if metric_found is None:
-                          print(' Accuracy-like metric not found in latest run')
-                          print('Available metrics:', [col for col in latest_run.index if col.startswith("metrics.")])
+                          print("❌ Accuracy-like metric not found in latest run.")
+                          print("Available metrics:")
+                          for col in latest_run.index:
+                              if col.startswith("metrics."):
+                                  print(f"  - {col}")
                           sys.exit(1)
 
                       accuracy = float(latest_run[metric_found])
-                      print(f' Using metric: {metric_found} = {accuracy:.4f}')
-                      
-                      # Validation criteria
+                      print(f"✅ Using metric: {metric_found} = {accuracy:.4f}")
+
+                      # Validation logic
                       min_accuracy = 0.70
                       if accuracy >= min_accuracy:
-                          print(f' Model passed validation (accuracy {accuracy:.4f} >= {min_accuracy})')
-                          print('Model is ready for deployment!')
+                          print(f"🎯 Model passed validation (accuracy {accuracy:.4f} >= {min_accuracy})")
+                          print("✅ Model is ready for deployment!")
                       else:
-                          print(f' Model failed validation (accuracy {accuracy:.4f} < {min_accuracy})')
-                          print('Model needs improvement before deployment.')
+                          print(f"⚠️ Model failed validation (accuracy {accuracy:.4f} < {min_accuracy})")
+                          print("❌ Model needs improvement before deployment.")
                           sys.exit(1)
-                          
+
                   except Exception as e:
-                      print(f' Error during validation: {str(e)}')
+                      print(f"❌ Error during validation: {e}")
                       import traceback
                       traceback.print_exc()
                       sys.exit(1)
-                  "
+                  PYCODE
 
             - name: Generate summary report
               if: always()
@@ -182,10 +175,10 @@ jobs:
                   echo "" >> ../training_summary.md
 
                   if [ -d "mlruns" ]; then
-                    echo "- **Status**:  Training completed successfully" >> ../training_summary.md
+                    echo "- **Status**: ✅ Training completed successfully" >> ../training_summary.md
                     echo "- **Artifacts**: MLflow artifacts generated" >> ../training_summary.md
                   else
-                    echo "- **Status**:  Training failed" >> ../training_summary.md
+                    echo "- **Status**: ❌ Training failed" >> ../training_summary.md
                   fi
 
                   cat ../training_summary.md
@@ -197,23 +190,6 @@ jobs:
                   name: training-summary
                   path: training_summary.md
                   retention-days: 30
-
-            - name: Upload MLflow artifacts to GitHub
-              if: always()
-              run: |
-                  echo " Uploading MLflow artifacts to repository..."
-                  git config --global user.email "github-actions@github.com"
-                  git config --global user.name "github-actions[bot]"
-
-                  cd MLProject
-                  git init
-                  git remote add origin https://github.com/itspiroy/Workflow-CI.git
-                  git fetch origin main
-                  git checkout main
-                  cd ..
-                  git add MLProject/mlruns/
-                  git commit -m "Auto upload MLflow artifacts [skip ci]" || echo "No changes to commit"
-                  git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/itspiroy/Workflow-CI.git main
 
             - name: Set MLflow Tracking URI
               run: echo "MLFLOW_TRACKING_URI=file:./mlruns" >> $GITHUB_ENV
