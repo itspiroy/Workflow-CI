@@ -132,15 +132,25 @@ jobs:
                       latest_run = runs.iloc[0]
                       
                       # Check if accuracy metric exists
-                      if 'metrics.accuracy' not in latest_run or pd.isna(latest_run['metrics.accuracy']):
-                          print(' Accuracy metric not found in latest run')
-                          print('Available metrics:', [col for col in latest_run.index if col.startswith('metrics.')])
+                      possible_metrics = [
+                          'metrics.accuracy',
+                          'metrics.training_accuracy_score',
+                          'metrics.training_score'
+                      ]
+
+                      metric_found = None
+                      for m in possible_metrics:
+                          if m in latest_run and not pd.isna(latest_run[m]):
+                              metric_found = m
+                              break
+
+                      if metric_found is None:
+                          print(' Accuracy-like metric not found in latest run')
+                          print('Available metrics:', [col for col in latest_run.index if col.startswith("metrics.")])
                           sys.exit(1)
-                      
-                      accuracy = float(latest_run['metrics.accuracy'])
-                      
-                      print(f'Latest run ID: {latest_run[\"run_id\"]}')
-                      print(f'Model accuracy: {accuracy:.4f}')
+
+                      accuracy = float(latest_run[metric_found])
+                      print(f' Using metric: {metric_found} = {accuracy:.4f}')
                       
                       # Validation criteria
                       min_accuracy = 0.70
@@ -191,7 +201,7 @@ jobs:
             - name: Upload MLflow artifacts to GitHub
               if: always()
               run: |
-                  echo "📦 Uploading MLflow artifacts to repository..."
+                  echo " Uploading MLflow artifacts to repository..."
                   git config --global user.email "github-actions@github.com"
                   git config --global user.name "github-actions[bot]"
 

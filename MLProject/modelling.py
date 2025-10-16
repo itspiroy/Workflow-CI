@@ -1,4 +1,4 @@
-# modelling.py (FINAL REVISI)
+# modelling.py
 import argparse
 import sys
 import warnings
