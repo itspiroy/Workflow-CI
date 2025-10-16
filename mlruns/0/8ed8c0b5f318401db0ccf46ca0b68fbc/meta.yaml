@@ -1,5 +1,5 @@
 artifact_uri: file:///C:/Users/aulin/OneDrive%20-%20Virtual%20Education%20Academy/Documents/Project/Dicoding/MLOps_Shafira/Workflow-CI/mlruns/0/8ed8c0b5f318401db0ccf46ca0b68fbc/artifacts
-end_time: null
+end_time: 1760620218593
 entry_point_name: ''
 experiment_id: '0'
 lifecycle_stage: active
@@ -10,6 +10,6 @@ source_name: ''
 source_type: 4
 source_version: ''
 start_time: 1760619545135
-status: 1
+status: 4
 tags: []
 user_id: aulin

@@ -37,7 +37,6 @@ jobs:
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install -r MLProject/requirements.txt || echo "No requirements.txt found"
                   pip install mlflow>=2.0.0 scikit-learn>=1.0.0 pandas>=1.3.0 numpy>=1.21.0 matplotlib>=3.5.0 seaborn>=0.11.0 pathlib2
 
             - name: Verify installation
@@ -47,7 +46,13 @@ jobs:
             - name: Run model training
               run: |
                   cd MLProject
-                  python modelling.py --data ../dataset_preprocessing/diabetes_preprocessed.csv --min-accuracy 0.7
+                  echo "🚀 Starting model training..."
+                  if mlflow run . -P data=../dataset_preprocessing/diabetes_preprocessed.csv -P min_accuracy=0.7; then
+                    echo "✅ MLflow run succeeded"
+                  else
+                    echo "⚠️ MLflow run failed, fallback to direct python execution"
+                    python modelling.py --data ../dataset_preprocessing/diabetes_preprocessed.csv --min-accuracy 0.7
+                  fi
 
             - name: Upload MLflow artifacts
               uses: actions/upload-artifact@v4
@@ -62,64 +67,52 @@ jobs:
                   cd MLProject
                   python - <<'PYCODE'
                   import mlflow
-                  import pandas as pd
-                  import sys
+                  from mlflow.tracking import MlflowClient
+                  import pandas as pd, sys, os, traceback
 
                   print("🚀 Starting model validation...")
-
                   mlflow.set_tracking_uri("file:./mlruns")
 
                   try:
-                      experiment = mlflow.get_experiment_by_name("diabetes-basic")
-                      if experiment is None:
+                      client = MlflowClient()
+                      exp = client.get_experiment_by_name("diabetes-basic")
+                      if exp is None:
                           print("❌ Experiment 'diabetes-basic' not found.")
                           sys.exit(1)
 
-                      experiment_id = experiment.experiment_id
-                      print(f"✅ Found experiment: {experiment.name} (ID: {experiment_id})")
+                      exp_id = exp.experiment_id
+                      print(f"✅ Found experiment: {exp.name} (ID: {exp_id})")
 
-                      runs = mlflow.search_runs(experiment_ids=[experiment_id])
-                      if runs.empty:
+                      runs = client.search_runs(experiment_ids=[exp_id], max_results=100, order_by=["attributes.start_time DESC"])
+                      if not runs:
                           print("❌ No runs found in experiment.")
                           sys.exit(1)
 
-                      print(f"ℹ️ Found {len(runs)} runs in MLflow.")
-
-                      latest_run = runs.iloc[0]
-
-                      possible_metrics = [
-                          "metrics.accuracy",
-                          "metrics.training_accuracy_score",
-                          "metrics.training_score"
-                      ]
-
-                      metric_found = None
-                      for m in possible_metrics:
-                          if m in latest_run and not pd.isna(latest_run[m]):
-                              metric_found = m
+                      run = runs[0]
+                      metrics = run.data.metrics
+                      possible_keys = ["accuracy","training_accuracy_score","training_score"]
+                      key_found, accuracy = None, None
+                      for k in possible_keys:
+                          if k in metrics:
+                              key_found, accuracy = k, metrics[k]
                               break
 
-                      if metric_found is None:
-                          print("❌ Accuracy metric not found in latest run.")
-                          print("Available metrics:")
-                          for col in latest_run.index:
-                              if col.startswith("metrics."):
-                                  print(f"  - {col}")
+                      if key_found is None:
+                          print("❌ No accuracy-like metric found.")
+                          print("Available metrics:", list(metrics.keys()))
                           sys.exit(1)
 
-                      accuracy = float(latest_run[metric_found])
-                      print(f"✅ Using metric: {metric_found} = {accuracy:.4f}")
-
-                      min_accuracy = 0.70
-                      if accuracy >= min_accuracy:
-                          print(f"🎯 Model PASSED validation ({accuracy:.4f} >= {min_accuracy})")
+                      print(f"✅ Using metric: {key_found} = {accuracy:.4f}")
+                      min_acc = 0.70
+                      if accuracy >= min_acc:
+                          print(f"🎯 Model PASSED validation ({accuracy:.4f} >= {min_acc})")
                       else:
-                          print(f"⚠️ Model FAILED validation ({accuracy:.4f} < {min_accuracy})")
+                          print(f"⚠️ Model FAILED validation ({accuracy:.4f} < {min_acc})")
                           sys.exit(1)
 
                   except Exception as e:
                       print(f"❌ Validation error: {e}")
-                      import traceback; traceback.print_exc()
+                      traceback.print_exc()
                       sys.exit(1)
                   PYCODE
 
