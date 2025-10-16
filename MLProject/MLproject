@@ -14,9 +14,3 @@ entry_points:
             data: { type: str, default: "../dataset_preprocessing/diabetes_preprocessed.csv" }
             min_accuracy: { type: float, default: 0.70 }
         command: "python modelling.py --data {data} --min-accuracy {min_accuracy}"
-
-    predict:
-        parameters:
-            model_path: { type: str }
-            data: { type: str }
-        command: "python predict.py --model-path {model_path} --data {data}"

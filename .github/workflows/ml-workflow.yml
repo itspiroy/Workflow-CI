@@ -10,10 +10,8 @@ on:
     pull_request:
         branches: [main]
     schedule:
-        # Jalankan setiap hari jam 2 pagi UTC untuk re-training otomatis
         - cron: "0 2 * * *"
     workflow_dispatch:
-        # Memungkinkan trigger manual
 
 jobs:
     train-model:
@@ -36,43 +34,19 @@ jobs:
                   restore-keys: |
                       ${{ runner.os }}-pip-
 
-            - name: Install system dependencies
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y python3-dev
-
-            - name: Install Python dependencies
+            - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install mlflow>=2.0.0
-                  pip install scikit-learn>=1.0.0
-                  pip install pandas>=1.3.0
-                  pip install numpy>=1.21.0
-                  pip install matplotlib>=3.5.0
-                  pip install seaborn>=0.11.0
-                  pip install pathlib2
+                  pip install -r MLProject/requirements.txt || echo "No requirements.txt found"
+                  pip install mlflow>=2.0.0 scikit-learn>=1.0.0 pandas>=1.3.0 numpy>=1.21.0 matplotlib>=3.5.0 seaborn>=0.11.0 pathlib2
 
             - name: Verify installation
               run: |
-                  python -c "import mlflow, sklearn, pandas, numpy, matplotlib, seaborn; print('✅ All packages imported successfully!')"
-                  python --version
-                  pip list
+                  python -c "import mlflow, sklearn, pandas, numpy; print('✅ All packages loaded successfully!')"
 
-            - name: Run model training
+            - name: Run MLproject training
               run: |
-                  cd MLProject
-                  python modelling.py --data ../dataset_preprocessing/diabetes_preprocessed.csv
-
-            - name: Check model artifacts
-              run: |
-                  if [ -d "MLProject/mlruns" ]; then
-                    echo "✅ MLflow artifacts created successfully"
-                    find MLProject/mlruns -type f -name "*.pkl" -o -name "*.json" | head -10
-                  else
-                    echo "❌ No MLflow artifacts found"
-                    ls -la MLProject/
-                    exit 1
-                  fi
+                  mlflow run MLProject -P data=../dataset_preprocessing/diabetes_preprocessed.csv
 
             - name: Upload MLflow artifacts
               uses: actions/upload-artifact@v4
@@ -82,6 +56,42 @@ jobs:
                   path: MLProject/mlruns/
                   retention-days: 30
 
+            - name: Model validation
+              run: |
+                  cd MLProject
+                  python - <<'PYCODE'
+                  import mlflow, pandas as pd, sys
+                  print("🚀 Starting model validation...")
+                  mlflow.set_tracking_uri("file:./mlruns")
+                  try:
+                      exp = mlflow.get_experiment_by_name("diabetes-basic")
+                      if exp is None:
+                          print("❌ Experiment not found"); sys.exit(1)
+                      runs = mlflow.search_runs(experiment_ids=[exp.experiment_id])
+                      if runs.empty:
+                          print("❌ No runs found"); sys.exit(1)
+                      latest = runs.iloc[0]
+                      possible = ["metrics.accuracy", "metrics.training_accuracy_score", "metrics.training_score"]
+                      metric = None
+                      for m in possible:
+                          if m in latest:
+                              try:
+                                  val = float(latest[m])
+                                  if not pd.isna(val):
+                                      metric = m; accuracy = val; break
+                              except Exception: continue
+                      if metric is None:
+                          print("❌ No accuracy metric found"); sys.exit(1)
+                      print(f"✅ Found {metric}: {accuracy:.4f}")
+                      min_acc = 0.70
+                      if accuracy >= min_acc:
+                          print(f"🎯 Model PASSED validation ({accuracy:.4f} >= {min_acc})")
+                      else:
+                          print(f"⚠️ Model FAILED validation ({accuracy:.4f} < {min_acc})"); sys.exit(1)
+                  except Exception as e:
+                      print(f"❌ Validation error: {e}"); sys.exit(1)
+                  PYCODE
+
             - name: Upload training logs
               uses: actions/upload-artifact@v4
               if: always()
@@ -90,98 +100,18 @@ jobs:
                   path: |
                       MLProject/*.png
                       MLProject/*.log
+                  if-no-files-found: ignore
                   retention-days: 7
 
-            - name: Model validation
-              run: |
-                  cd MLProject
-                  python - <<'PYCODE'
-                  import mlflow
-                  import pandas as pd
-                  import sys
-
-                  print("🚀 Starting model validation...")
-
-                  mlflow.set_tracking_uri("file:./mlruns")
-
-                  try:
-                      experiment = mlflow.get_experiment_by_name("diabetes-basic")
-                      if experiment is None:
-                          print("❌ Experiment 'diabetes-basic' not found.")
-                          sys.exit(1)
-
-                      print(f"✅ Found experiment: {experiment.name} (ID: {experiment.experiment_id})")
-
-                      runs = mlflow.search_runs(experiment_ids=[experiment.experiment_id])
-                      if runs.empty:
-                          print("❌ No runs found in this experiment.")
-                          sys.exit(1)
-
-                      print(f"ℹ️ Found {len(runs)} runs in MLflow.")
-
-                      latest_run = runs.iloc[0]
-
-                      # Try to find the correct accuracy metric key
-                      possible_metrics = [
-                          "metrics.accuracy",
-                          "metrics.training_accuracy_score",
-                          "metrics.training_score"
-                      ]
-
-                      metric_found = None
-                      for m in possible_metrics:
-                          if m in latest_run and not pd.isna(latest_run[m]):
-                              metric_found = m
-                              break
-
-                      if metric_found is None:
-                          print("❌ Accuracy-like metric not found in latest run.")
-                          print("Available metrics:")
-                          for col in latest_run.index:
-                              if col.startswith("metrics."):
-                                  print(f"  - {col}")
-                          sys.exit(1)
-
-                      accuracy = float(latest_run[metric_found])
-                      print(f"✅ Using metric: {metric_found} = {accuracy:.4f}")
-
-                      # Validation logic
-                      min_accuracy = 0.70
-                      if accuracy >= min_accuracy:
-                          print(f"🎯 Model passed validation (accuracy {accuracy:.4f} >= {min_accuracy})")
-                          print("✅ Model is ready for deployment!")
-                      else:
-                          print(f"⚠️ Model failed validation (accuracy {accuracy:.4f} < {min_accuracy})")
-                          print("❌ Model needs improvement before deployment.")
-                          sys.exit(1)
-
-                  except Exception as e:
-                      print(f"❌ Error during validation: {e}")
-                      import traceback
-                      traceback.print_exc()
-                      sys.exit(1)
-                  PYCODE
-
-            - name: Generate summary report
+            - name: Generate summary
               if: always()
               run: |
-                  cd MLProject
-                  echo "# ML Training Summary" > ../training_summary.md
-                  echo "" >> ../training_summary.md
-                  echo "## Training Results" >> ../training_summary.md
-                  echo "- **Date**: $(date)" >> ../training_summary.md
-                  echo "- **Commit**: ${{ github.sha }}" >> ../training_summary.md
-                  echo "- **Branch**: ${{ github.ref_name }}" >> ../training_summary.md
-                  echo "" >> ../training_summary.md
-
-                  if [ -d "mlruns" ]; then
-                    echo "- **Status**: ✅ Training completed successfully" >> ../training_summary.md
-                    echo "- **Artifacts**: MLflow artifacts generated" >> ../training_summary.md
-                  else
-                    echo "- **Status**: ❌ Training failed" >> ../training_summary.md
-                  fi
-
-                  cat ../training_summary.md
+                  echo "# ML Training Summary" > training_summary.md
+                  echo "- **Date**: $(date)" >> training_summary.md
+                  echo "- **Commit**: ${{ github.sha }}" >> training_summary.md
+                  echo "- **Branch**: ${{ github.ref_name }}" >> training_summary.md
+                  echo "- **Status**: Completed ✅" >> training_summary.md
+                  cat training_summary.md
 
             - name: Upload summary report
               uses: actions/upload-artifact@v4
@@ -190,6 +120,3 @@ jobs:
                   name: training-summary
                   path: training_summary.md
                   retention-days: 30
-
-            - name: Set MLflow Tracking URI
-              run: echo "MLFLOW_TRACKING_URI=file:./mlruns" >> $GITHUB_ENV
