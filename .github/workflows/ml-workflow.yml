@@ -44,9 +44,10 @@ jobs:
               run: |
                   python -c "import mlflow, sklearn, pandas, numpy; print('✅ All packages loaded successfully!')"
 
-            - name: Run MLproject training
+            - name: Run model training
               run: |
-                  mlflow run MLProject -P data=../dataset_preprocessing/diabetes_preprocessed.csv
+                  cd MLProject
+                  python modelling.py --data ../dataset_preprocessing/diabetes_preprocessed.csv --min-accuracy 0.7
 
             - name: Upload MLflow artifacts
               uses: actions/upload-artifact@v4
