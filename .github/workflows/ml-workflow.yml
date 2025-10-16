@@ -61,36 +61,66 @@ jobs:
               run: |
                   cd MLProject
                   python - <<'PYCODE'
-                  import mlflow, pandas as pd, sys
+                  import mlflow
+                  import pandas as pd
+                  import sys
+
                   print("🚀 Starting model validation...")
+
                   mlflow.set_tracking_uri("file:./mlruns")
+
                   try:
-                      exp = mlflow.get_experiment_by_name("diabetes-basic")
-                      if exp is None:
-                          print("❌ Experiment not found"); sys.exit(1)
-                      runs = mlflow.search_runs(experiment_ids=[exp.experiment_id])
+                      experiment = mlflow.get_experiment_by_name("diabetes-basic")
+                      if experiment is None:
+                          print("❌ Experiment 'diabetes-basic' not found.")
+                          sys.exit(1)
+
+                      experiment_id = experiment.experiment_id
+                      print(f"✅ Found experiment: {experiment.name} (ID: {experiment_id})")
+
+                      runs = mlflow.search_runs(experiment_ids=[experiment_id])
                       if runs.empty:
-                          print("❌ No runs found"); sys.exit(1)
-                      latest = runs.iloc[0]
-                      possible = ["metrics.accuracy", "metrics.training_accuracy_score", "metrics.training_score"]
-                      metric = None
-                      for m in possible:
-                          if m in latest:
-                              try:
-                                  val = float(latest[m])
-                                  if not pd.isna(val):
-                                      metric = m; accuracy = val; break
-                              except Exception: continue
-                      if metric is None:
-                          print("❌ No accuracy metric found"); sys.exit(1)
-                      print(f"✅ Found {metric}: {accuracy:.4f}")
-                      min_acc = 0.70
-                      if accuracy >= min_acc:
-                          print(f"🎯 Model PASSED validation ({accuracy:.4f} >= {min_acc})")
+                          print("❌ No runs found in experiment.")
+                          sys.exit(1)
+
+                      print(f"ℹ️ Found {len(runs)} runs in MLflow.")
+
+                      latest_run = runs.iloc[0]
+
+                      possible_metrics = [
+                          "metrics.accuracy",
+                          "metrics.training_accuracy_score",
+                          "metrics.training_score"
+                      ]
+
+                      metric_found = None
+                      for m in possible_metrics:
+                          if m in latest_run and not pd.isna(latest_run[m]):
+                              metric_found = m
+                              break
+
+                      if metric_found is None:
+                          print("❌ Accuracy metric not found in latest run.")
+                          print("Available metrics:")
+                          for col in latest_run.index:
+                              if col.startswith("metrics."):
+                                  print(f"  - {col}")
+                          sys.exit(1)
+
+                      accuracy = float(latest_run[metric_found])
+                      print(f"✅ Using metric: {metric_found} = {accuracy:.4f}")
+
+                      min_accuracy = 0.70
+                      if accuracy >= min_accuracy:
+                          print(f"🎯 Model PASSED validation ({accuracy:.4f} >= {min_accuracy})")
                       else:
-                          print(f"⚠️ Model FAILED validation ({accuracy:.4f} < {min_acc})"); sys.exit(1)
+                          print(f"⚠️ Model FAILED validation ({accuracy:.4f} < {min_accuracy})")
+                          sys.exit(1)
+
                   except Exception as e:
-                      print(f"❌ Validation error: {e}"); sys.exit(1)
+                      print(f"❌ Validation error: {e}")
+                      import traceback; traceback.print_exc()
+                      sys.exit(1)
                   PYCODE
 
             - name: Upload training logs
