@@ -71,26 +71,56 @@ jobs:
                   import pandas as pd, sys, os, traceback
 
                   print("🚀 Starting model validation...")
-                  mlflow.set_tracking_uri("file:./mlruns")
+
+                  # Coba beberapa lokasi tracking URI
+                  possible_uris = [
+                      "file:./mlruns",
+                      "file:../mlruns",
+                      "file:/tmp/mlruns"
+                  ]
+
+                  client = None
+                  experiment = None
+
+                  for uri in possible_uris:
+                      try:
+                          mlflow.set_tracking_uri(uri)
+                          client = MlflowClient()
+                          experiment = client.get_experiment_by_name("diabetes-basic")
+                          if experiment:
+                              print(f"✅ Found experiment in {uri}")
+                              break
+                      except Exception as e:
+                          continue
+
+                  if experiment is None:
+                      print("❌ Experiment 'diabetes-basic' not found in any known MLflow directory.")
+                      sys.exit(1)
 
                   try:
-                      client = MlflowClient()
-                      exp = client.get_experiment_by_name("diabetes-basic")
-                      if exp is None:
-                          print("❌ Experiment 'diabetes-basic' not found.")
-                          sys.exit(1)
+                      exp_id = experiment.experiment_id
+                      print(f"✅ Using experiment: {experiment.name} (ID: {exp_id})")
 
-                      exp_id = exp.experiment_id
-                      print(f"✅ Found experiment: {exp.name} (ID: {exp_id})")
-
-                      runs = client.search_runs(experiment_ids=[exp_id], max_results=100, order_by=["attributes.start_time DESC"])
+                      runs = client.search_runs(experiment_ids=[exp_id], order_by=["attributes.start_time DESC"])
                       if not runs:
                           print("❌ No runs found in experiment.")
                           sys.exit(1)
 
-                      run = runs[0]
+                      # Temukan run dengan metrik valid
+                      run = None
+                      for r in runs:
+                          if r.data.metrics:
+                              run = r
+                              break
+
+                      if not run:
+                          print("❌ No runs with metrics found.")
+                          sys.exit(1)
+
                       metrics = run.data.metrics
-                      possible_keys = ["accuracy","training_accuracy_score","training_score"]
+                      print(f"📊 Found metrics: {list(metrics.keys())}")
+
+                      possible_keys = ["accuracy", "training_accuracy_score", "training_score"]
                       key_found, accuracy = None, None
                       for k in possible_keys:
                           if k in metrics:
